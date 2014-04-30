@@ -1,0 +1,16 @@
+<tools>
+    <tool id="db-landscape" title="DB Landscape" projectTypes="inventory">
+        <description>Generates a list of databases used by application/environment</description>
+        <parameters>
+
+            <parameter name="p_db_filter"  title="Database Filter"   type="string" required="false" width="300" />
+
+            <parameter name="p_app_filter"  title="Application Filter"   type="string" required="false" width="300" />
+
+            <!-- parameter name="p_fields"     title="Fields To Include" type="string" required="false" width="300" 
+                       defaultValue="Deleted;State;Notes" / -->
+        </parameters>
+
+        <output  script="db-landscape.groovy" type="html" />
+    </tool>
+</tools>
