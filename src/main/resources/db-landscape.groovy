@@ -14,15 +14,15 @@ def emptystr(obj) {
 }
 
 
-StringBuilder importLog = new StringBuilder(10000);
+StringBuilder importLog = new StringBuilder(10000)
 
-InventoryService inventorySrv = dbm.getService(InventoryService.class);
+InventoryService inventorySrv = dbm.getService(InventoryService.class)
 
 inventoryDBs = new ArrayList(inventorySrv.getDatabaseList(new QueryRequest(p_db_filter)))
 
 inventoryDBs.sort { it.getServerName()+"_"+it.getDatabaseName()  }
 
-def db2AppsLinks = inventorySrv.getDBUsageList();
+def db2AppsLinks = inventorySrv.getDBUsageList()
 dbApps = db2AppsLinks.groupBy { it.getDatabase() }
 
 // fields = p_fields == null ? [] : p_fields.split(";")
@@ -94,7 +94,7 @@ dbGrid.each {
         println "<td style=\"padding:5px\">"
         if (dbList!=null) {
             dbList.each { db ->
-                def link = "#inventory/project:${toURL(projectName)}/databases/server:${toURL(db.getServerName())},db:${toURL(db.getDatabaseName())}/applications"
+                def link = "#inventory/project:${toURL(projectName)}/databases/connection:${toURL(db.getServerName())},db:${toURL(db.getDatabaseName())}/applications"
                 println "<a href=\"${link}\">${db.getServerName()}.${db.getDatabaseName()}</a><br/>"
             }
         }
