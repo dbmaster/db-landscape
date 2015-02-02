@@ -10,7 +10,7 @@
     <name>DB Landscape</name>
     <description>Generates a list of databases used by application/environment</description>
 
-    <version>0.1.1</version>
+    <version>0.2.0</version>
     <packaging>bundle</packaging>
 
     <parent>
