@@ -7,6 +7,8 @@ import com.branegy.inventory.api.InventoryService
 import com.branegy.inventory.model.Database
 import com.branegy.service.core.QueryRequest
 import com.branegy.service.base.api.ProjectService
+import com.branegy.dbmaster.custom.field.server.api.ICustomFieldService
+
 
 
 def emptystr(obj) {
@@ -20,7 +22,7 @@ InventoryService inventorySrv = dbm.getService(InventoryService.class)
 
 inventoryDBs = new ArrayList(inventorySrv.getDatabaseList(new QueryRequest(p_db_filter)))
 
-inventoryDBs.sort { it.getServerName()+"_"+it.getDatabaseName()  }
+inventoryDBs.sort { it.getServerName()+"_"+it.getDatabaseName() }
 
 def db2AppsLinks = inventorySrv.getDBUsageList()
 dbApps = db2AppsLinks.groupBy { it.getDatabase() }
@@ -29,7 +31,7 @@ dbApps = db2AppsLinks.groupBy { it.getDatabase() }
 
 def environments = [] as Set
 
-def dbGrid = new TreeMap()
+def dbGrid = new TreeMap(String.CASE_INSENSITIVE_ORDER)
 
 def mapDbToApp =  { databaseGrid, appName, database, environment ->
     def dbByEnv = databaseGrid[appName] 
@@ -45,7 +47,7 @@ def mapDbToApp =  { databaseGrid, appName, database, environment ->
     dbList << database
 }
 
-def appList = null;
+def appList = null
 if (p_app_filter!=null) { 
     appList = inventorySrv.getApplicationList(new QueryRequest(p_app_filter))
 }
@@ -73,8 +75,18 @@ for (Database database: inventoryDBs) {
     }
 }
 
+ICustomFieldService cfService = dbm.getService(ICustomFieldService.class)
+def envCF = cfService.getConfigByName("Database", "Environment")
+def envList = []
 
-environments = environments.sort { it }
+if (envCF!=null && envCF.getTextValues()!=null) { 
+    envList.addAll( envCF.getTextValues() )
+    envList.add ( "Undefined" )
+    logger.info( " Env list = ${ envList.join ("...") }  ")
+}
+
+
+environments = environments.sort {  env-> envList.size == 0 ? it : envList.findIndexOf { it.equals(env) }  }
 
 println """<table class="simple-table" cellspacing="0" cellpadding="10">
            <tr style="background-color:#EEE">
