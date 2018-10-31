@@ -7,6 +7,7 @@ import com.branegy.inventory.api.InventoryService
 import com.branegy.inventory.model.Database
 import com.branegy.service.core.QueryRequest
 import com.branegy.service.base.api.ProjectService
+import com.branegy.service.connection.api.ConnectionService
 import com.branegy.dbmaster.custom.field.server.api.ICustomFieldService
 import com.branegy.inventory.api.ContactLinkService
 import com.branegy.inventory.api.ContactService
@@ -17,6 +18,7 @@ import com.branegy.inventory.model.Contact
 import com.branegy.inventory.model.ContactLink
 import com.branegy.inventory.model.Job
 import com.branegy.inventory.model.Server
+import com.branegy.service.connection.model.DatabaseConnection;
 
 final InventoryService inventorySrv = dbm.getService(InventoryService.class)
 
@@ -58,20 +60,22 @@ contacts.clear();
 // environments + server + database 
 def environments = [] as Set
 def servers = inventorySrv.getServerList(new QueryRequest()).sort{it.serverName}.collectEntries{[(it.serverName): it]};
+def connections = dbm.getService(ConnectionService.class).getConnectionList().collectEntries{[(it.name): it]};
 
 def getDatabaseServerKey = {database -> return database.connectionName+"=>"+database.databaseName}
-def getEnvironmentByServer =  { serverName -> return servers.get(serverName)?.getCustomData("Environment")}
+def getEnvironmentByConnection =  { connectionName -> return connections.get(connectionName)?.getCustomData("Environment")}
+def getEnvironmentByServer =  { serverName -> return connections.get(serverName)?.getCustomData("Environment")}
 def getEnvironmentByJob = {job ->
     def env = job.getCustomData("Environment");
     if (env == null) {
-        env = getEnvironmentByServer(job.serverName);
+        env = getEnvironmentByConnection(job.serverName);
     }
     return env;
 };
 def getEnvironmentByDatabase = {obj ->
     def env = obj.getCustomData("Environment");
     if (env == null) {
-        env = getEnvironmentByServer(obj.connectionName);
+        env = getEnvironmentByConnection(obj.connectionName);
     }
     return env;
 };
@@ -128,6 +132,7 @@ jobs.clear();
 jobApp.clear();
 
 
+
 // servers
 servers.keySet().removeAll(usedServers);
 if (!servers.isEmpty()) {
@@ -142,6 +147,7 @@ if (!servers.isEmpty()) {
 }
 servers.clear();
 
+connections.clear();
 
 // sort environment
 environments = new ArrayList(environments).sort();
@@ -172,10 +178,10 @@ if (undefined!=null) {
     println "<tr style=\"vertical-align: top;\">"
     println "<td>&lt;undefined&gt;</td>"
     println "<td>"
-    undefined.contacts.each{
+    /*undefined.contacts.each{
         def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contactName)}"
         println "<a href=\"${link}\">${it.contactName}</a><br/>"
-    }
+    }*/
     println "</td>"
     environments.each{ env ->
         println "<td style=\"padding:5px\">"
