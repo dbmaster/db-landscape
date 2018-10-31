@@ -136,7 +136,7 @@ if (!servers.isEmpty()) {
     }
     servers.values().each{
         def env = getEnvironmentByServer(it.serverName);
-        undefined.envServers.put(env,it);
+        undefined.envServers.computeIfAbsent(env,{k->new ArrayList()}) << it;
         environments << env;
     }
 }
