@@ -78,8 +78,6 @@ def getEnvironmentByDatabase = {obj ->
 
 def databases = inventorySrv.getDatabaseList(new QueryRequest(p_db_filter)).sort{getDatabaseServerKey(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
 
-logger.info("Databases {}",databases.keySet());
-
 def usedDatabases = [] as Set;
 def usedServers = [] as Set;
 inventorySrv.getDBUsageList().each{
@@ -91,7 +89,6 @@ inventorySrv.getDBUsageList().each{
 }
 
 databases.keySet().removeAll(usedDatabases);
-logger.info("Left {}",databases.keySet());
 if (!databases.isEmpty()) {
     if (undefined == null) {
         undefined = new UnderfinedRow();
@@ -110,9 +107,9 @@ databases.clear();
 
 // jobs
 def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
-def jobs = inventorySrv.getJobList(new QueryRequest(p_job_filter)).sort{it.jobName};
+def jobs = inventorySrv.getJobList(new QueryRequest(p_job_filter)).sort{getJobKey(it)};
 def jobApp = new ArrayList(inventorySrv.findApplicationLinkListByObjectClass(Job.class))
-        .sort{it.job.jobName}.collectEntries{[(getJobKey(it.job)): it.application]};
+        .sort{getJobKey(it.job)}.collectEntries{[(getJobKey(it.job)): it.application]};
 jobs.each{ job->
     def jobKey = getJobKey(job);
     def envJob = getEnvironmentByJob(job);
