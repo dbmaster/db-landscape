@@ -77,6 +77,9 @@ def getEnvironmentByDatabase = {obj ->
 };
 
 def databases = inventorySrv.getDatabaseList(new QueryRequest(p_db_filter)).sort{getDatabaseServerKey(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
+
+logger.info("Databases {}",databases.keySet());
+
 def usedDatabases = [] as Set;
 def usedServers = [] as Set;
 inventorySrv.getDBUsageList().each{
@@ -88,13 +91,14 @@ inventorySrv.getDBUsageList().each{
 }
 
 databases.keySet().removeAll(usedDatabases);
+logger.info("Left {}",databases.keySet());
 if (!databases.isEmpty()) {
     if (undefined == null) {
         undefined = new UnderfinedRow();
     }
     databases.values().each{
         def env = getEnvironmentByDatabase(it);
-        undefined.envDatabases.put(env,it);
+        undefined.envDatabases.computeIfAbsent(env,{k-> new ArrayList()}) << it;
         environments << env;
         usedServers << it.connectionName;
     }
@@ -105,28 +109,26 @@ databases.clear();
 
 
 // jobs
-def usedJob = [] as Set;
-def jobs = inventorySrv.getJobList(new QueryRequest(p_job_filter)).sort{it.jobName}.collectEntries{[(it.jobName): it]};
-jobs.values().each{ job->
-    def appLinks = inventorySrv.findApplicationLinkListByObject(job, new QueryRequest());
-    appLinks.each{ appLink ->
-        data.get(appLink.application.applicationName).envJobs.put(getEnvironmentByJob(job),job)
-        usedJob << job.jobName
-    };
+def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
+def jobs = inventorySrv.getJobList(new QueryRequest(p_job_filter)).sort{it.jobName};
+def jobApp = new ArrayList(inventorySrv.findApplicationLinkListByObjectClass(Job.class))
+        .sort{it.job.jobName}.collectEntries{[(getJobKey(it.job)): it.application]};
+jobs.each{ job->
+    def jobKey = getJobKey(job);
+    def envJob = getEnvironmentByJob(job);
+    def app = jobApp.get(jobKey);
+    if (app!=null) {
+        data.get(app.applicationName).envJobs.put(envJob,job)
+    } else {
+        if (undefined == null) {
+            undefined = new UnderfinedRow();
+        }
+        undefined.envJobs.computeIfAbsent(envJob,{k-> new ArrayList()}) << job;
+        environments << envJob;
+    }
 };
-jobs.keySet().removeAll(usedJob)
-if (!jobs.isEmpty()) {
-    if (undefined == null) {
-        undefined = new UnderfinedRow();
-    }
-    jobs.values().each{
-        def env = getEnvironmentByJob(it);
-        undefined.envJobs.put(env,it);
-        environments << env;
-    }
-}
 jobs.clear();
-usedJob.clear();
+jobApp.clear();
 
 
 // servers
@@ -207,8 +209,6 @@ if (undefined!=null) {
     println "</tr>"
 }
 
-
-
 data.each {
     println "<tr style=\"vertical-align: top;\">"
     
@@ -217,7 +217,7 @@ data.each {
     println "<td>"
     it.value.contactLinks.each{    
         def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contact.contactName)}"
-        println "<a href=\"${link}\">${it.contact.contactName}</a> ${it.getCustomData("ContactRole")}<br/>"
+        println "<a href=\"${link}\">${it.contact.contactName}</a> ${emptystr(it.getCustomData("ContactRole"))}<br/>"
     }
     println "</td>"
     
@@ -228,8 +228,8 @@ data.each {
         if (envDatabases.containsKey(env)) {
            println "Databases<br/>";
            envDatabases.get(env).each{ db->
-               def link = "#inventory/project:${toURL(projectName)}/databases/connection:${toURL(db.serverName)},db:${toURL(db.databaseName)}/applications"
-               println "<a href=\"${link}\">${db.serverName}.${db.databaseName}</a><br/>"
+               def link = "#inventory/project:${toURL(projectName)}/databases/connection:${toURL(db.connectionName)},db:${toURL(db.databaseName)}/applications"
+               println "<a href=\"${link}\">${db.connectionName}.${db.databaseName}</a><br/>"
            }
         }
         if (envJobs.containsKey(env)) {
