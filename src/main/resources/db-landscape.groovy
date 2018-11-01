@@ -182,12 +182,22 @@ def emptystr(obj) {
 
 def undefinedColumn = environments.contains(null);
 
+println """<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js" defer></script>"""
+println """<script src="https://cdnjs.cloudflare.com/ajax/libs/floatthead/2.0.3/jquery.floatThead.min.js" defer></script>"""
+def inlineScriptBase64 = """
+\$(function(){
+   \$('table.simple-table').floatThead();
+});
+""".bytes.encodeBase64();
+println """<script src="data:text/javascript;base64,${inlineScriptBase64}" defer></script>"""
+
 println """<table class="simple-table" cellspacing="0" cellpadding="10">
+           <thead>
            <tr style="background-color:#EEE">
-             <td>Application</td>
-             <td>Contacts</td>
-             ${environments.collect{ "<td>${it==null?"&lt;undefined&gt;":it}</td>" }.join("")}
-           </tr>"""
+             <th>Application</th>
+             <th>Contacts</th>
+             ${environments.collect{ "<th>${it==null?"&lt;undefined&gt;":it}</th>" }.join("")}
+           </tr></thead><tbody>"""
 
 def toURL = { link -> link.encodeURL().replaceAll("\\+", "%20") }
 String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
@@ -280,4 +290,4 @@ data.each {
     }
     println "</tr>"
 }
-println "</table>"
+println "</tbody></table>"
