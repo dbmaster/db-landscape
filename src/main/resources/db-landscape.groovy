@@ -8,6 +8,7 @@ import com.branegy.inventory.model.Database
 import com.branegy.service.core.QueryRequest
 import com.branegy.service.base.api.ProjectService
 import com.branegy.service.connection.api.ConnectionService
+import com.branegy.dbmaster.custom.CustomFieldConfig
 import com.branegy.dbmaster.custom.field.server.api.ICustomFieldService
 import com.branegy.inventory.api.ContactLinkService
 import com.branegy.inventory.api.ContactService
@@ -24,7 +25,7 @@ final InventoryService inventorySrv = dbm.getService(InventoryService.class)
 
 class UnderfinedRow{
     final List<Contact> contacts = [];
-    final Map<String,List<Job>> envJobs = [:];
+    final Map<String,Map<String,List<Job>>> envJobs = [:]; // env -> jobType <-> Job
     final Map<String,List<Database>> envDatabases = [:];
     final Map<String,List<Server>> envServers = [:];
 }
@@ -32,7 +33,7 @@ class UnderfinedRow{
 class AppNameRow{
     final Map<String,List<Database>> envDatabases = [:];
     final List<ContactLink> contactLinks = [];
-    final Map<String,List<Job>> envJobs = [:];
+    final Map<String,Map<String,List<Job>>> envJobs = [:];
     final Map<String,List<Server>> envServers = [:];
 }
 
@@ -123,12 +124,12 @@ jobs.each{ job ->
     def envJob = getEnvironmentByJob(job);
     def app = jobApp.get(jobKey);
     if (app!=null) {
-        data.get(app.applicationName).envJobs.computeIfAbsent(envJob,{k->new ArrayList()}) << job
+        data.get(app.applicationName).envJobs.computeIfAbsent(envJob,{k->new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job
     } else {
         if (undefined == null) {
             undefined = new UnderfinedRow();
         }
-        undefined.envJobs.computeIfAbsent(envJob,{k-> new ArrayList()}) << job;
+        undefined.envJobs.computeIfAbsent(envJob,{k-> new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job;
         environments << envJob;
     }
 };
@@ -159,7 +160,18 @@ servers.clear();
 connections.clear();
 
 // sort environment
-environments = new ArrayList(environments).sort();
+CustomFieldConfig config = dbm.getService(ICustomFieldService.class).getConfigByName("Connection","Environment");
+def sortedEnvironments = new LinkedHashSet();
+if (environments.contains(null)) {
+    sortedEnvironments << null;
+}
+config?.textValues?.each{ v ->
+    if (environments.contains(v)) {
+        sortedEnvironments << v;
+    }        
+}
+sortedEnvironments.addAll(environments);
+environments = sortedEnvironments;
 
 //============================================================================================================
 logger.info( " Env list = ${ environments.join(" ")}")
@@ -209,10 +221,12 @@ if (undefined!=null) {
             }
         }
         if (undefined.envJobs.containsKey(env)) {
-            println "Jobs<br/>";
-            undefined.envJobs.get(env).each{ job->
-                def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
-                println "<a href=\"${link}\">${job.serverName}.${job.jobName} [${job.jobType}]</a><br/>"
+            undefined.envJobs.get(env).entrySet().each{ e ->
+                println e.key+" jobs<br/>";
+                e.value.each{  job->
+                    def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
+                    println "<a href=\"${link}\">${job.serverName}.${job.jobName}</a><br/>"
+                }
             }
         }
         println "</td>"
@@ -253,10 +267,12 @@ data.each {
            }
         }
         if (envJobs.containsKey(env)) {
-            println "Jobs<br/>";
-            envJobs.get(env).each{ job->
-                def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
-                println "<a href=\"${link}\">${job.serverName}.${job.jobName} [${job.jobType}]</a><br/>"
+            envJobs.get(env).entrySet().each{ e ->
+                println e.key+" jobs<br/>";
+                e.value.each{  job->
+                    def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
+                    println "<a href=\"${link}\">${job.serverName}.${job.jobName}</a><br/>"
+                }
             }
         }
         println "</td>"
