@@ -11,6 +11,8 @@
             
             <parameter name="p_job_filter"  title="Job Filter"   type="string" required="false" width="300" />
             
+            <parameter name="p_server_filter"  title="Server Filter"   type="string" required="false" width="300" />
+            
 
             <!-- parameter name="p_fields"     title="Fields To Include" type="string" required="false" width="300" 
                        defaultValue="Deleted;State;Notes" / -->
