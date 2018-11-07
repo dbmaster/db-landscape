@@ -43,12 +43,12 @@ Map<String,AppNameRow> data = new TreeMap(String.CASE_INSENSITIVE_ORDER);
 UnderfinedRow undefined;
 
 // applications
-inventorySrv.getApplicationList(new QueryRequest(p_app_filter)).each{
+inventorySrv.getApplicationList(new QueryRequest(/*p_app_filter*/)).each{
    data.computeIfAbsent(it.applicationName,{k-> new AppNameRow()});
 }
 
 // contactLinks
-def contacts = dbm.getService(ContactService.class).getContactList(new QueryRequest(p_contact_filter)).collectEntries{[(it.contactName):it]};
+def contacts = dbm.getService(ContactService.class).getContactList(new QueryRequest(/*p_contact_filter*/)).collectEntries{[(it.contactName):it]};
 new ArrayList(dbm.getService(ContactLinkService.class).findAllByClass(Application.class,null)).sort{it.contact.contactName}.each{
     data.get(it.application.applicationName).contactLinks << it;
     contacts.remove(it.contact.contactName);
@@ -86,7 +86,7 @@ def getEnvironmentByDatabase = {obj ->
 
 def ignoreDatabase = {database -> return ["master","msdb","tempdb","model"].contains(database.databaseName)};
 
-def databases = inventorySrv.getDatabaseList(new QueryRequest(p_db_filter)).findAll{!ignoreDatabase(it)}.sort{getDatabaseServerKey(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
+def databases = inventorySrv.getDatabaseList(new QueryRequest(/*p_db_filter*/)).findAll{!ignoreDatabase(it)}.sort{getDatabaseServerKey(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
 def usedDatabases = [] as Set;
 def usedConnections = [] as Set;
 inventorySrv.getDBUsageList().each{
@@ -118,7 +118,7 @@ databases.clear();
 
 // jobs
 def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
-def jobs = inventorySrv.getJobList(new QueryRequest(p_job_filter)).sort{getJobKey(it)};
+def jobs = inventorySrv.getJobList(new QueryRequest(/*p_job_filter*/)).sort{getJobKey(it)};
 def jobApp = new ArrayList(inventorySrv.findApplicationLinkListByObjectClass(Job.class))
         .sort{getJobKey(it.job)}.collectEntries{[(getJobKey(it.job)): it.application]};
 jobs.each{ job ->
@@ -141,7 +141,7 @@ jobApp.clear();
 
 // servers
 def getEnvironmentByServer =  { server -> return server.getCustomData("Environment")}
-def servers = inventorySrv.getServerList(new QueryRequest(p_server_filter)).sort{it.serverName}.collectEntries{[(it.serverName): it]};
+def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).sort{it.serverName}.collectEntries{[(it.serverName): it]};
 inventorySrv.getInstallationList().each{ installation ->
     def env = getEnvironmentByServer(installation.server);
     data.get(installation.application.applicationName).envServers.computeIfAbsent(env,{k->new ArrayList()}) << installation.server;
@@ -258,9 +258,9 @@ data.each {
     println "<td><a href=\"#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/databases\">${it.key}</a></td>"
     
     println "<td>"
-    it.value.contactLinks.each{    
-        def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contact.contactName)}"
-        println "<a href=\"${link}\">${it.contact.contactName}</a> ${emptystr(it.getCustomData(roleField))}<br/>"
+    it.value.contactLinks.each{ cl ->   
+        def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
+        println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
     }
     println "</td>"
     
