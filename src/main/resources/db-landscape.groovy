@@ -49,7 +49,7 @@ inventorySrv.getApplicationList(new QueryRequest(/*p_app_filter*/)).each{
 
 // contactLinks
 def contacts = dbm.getService(ContactService.class).getContactList(new QueryRequest(/*p_contact_filter*/)).collectEntries{[(it.contactName):it]};
-new ArrayList(dbm.getService(ContactLinkService.class).findAllByClass(Application.class,null)).sort{it.contact.contactName}.each{
+dbm.getService(ContactLinkService.class).findAllByClass(Application.class,null).each{
     data.get(it.application.applicationName).contactLinks << it;
     contacts.remove(it.contact.contactName);
 };
@@ -86,7 +86,7 @@ def getEnvironmentByDatabase = {obj ->
 
 def ignoreDatabase = {database -> return ["master","msdb","tempdb","model"].contains(database.databaseName)};
 
-def databases = inventorySrv.getDatabaseList(new QueryRequest(/*p_db_filter*/)).findAll{!ignoreDatabase(it)}.sort{getDatabaseServerKey(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
+def databases = inventorySrv.getDatabaseList(new QueryRequest(/*p_db_filter*/)).findAll{!ignoreDatabase(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
 def usedDatabases = [] as Set;
 def usedConnections = [] as Set;
 inventorySrv.getDBUsageList().each{
@@ -118,9 +118,9 @@ databases.clear();
 
 // jobs
 def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
-def jobs = inventorySrv.getJobList(new QueryRequest(/*p_job_filter*/)).sort{getJobKey(it)};
-def jobApp = new ArrayList(inventorySrv.findApplicationLinkListByObjectClass(Job.class))
-        .sort{getJobKey(it.job)}.collectEntries{[(getJobKey(it.job)): it.application]};
+def jobs = inventorySrv.getJobList(new QueryRequest(/*p_job_filter*/));
+def jobApp = inventorySrv.findApplicationLinkListByObjectClass(Job.class)
+        .collectEntries{[(getJobKey(it.job)): it.application]};
 jobs.each{ job ->
     def jobKey = getJobKey(job);
     def envJob = getEnvironmentByJob(job);
@@ -141,7 +141,7 @@ jobApp.clear();
 
 // servers
 def getEnvironmentByServer =  { server -> return server.getCustomData("Environment")}
-def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).sort{it.serverName}.collectEntries{[(it.serverName): it]};
+def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).collectEntries{[(it.serverName): it]};
 inventorySrv.getInstallationList().each{ installation ->
     def env = getEnvironmentByServer(installation.server);
     data.get(installation.application.applicationName).envServers.computeIfAbsent(env,{k->new ArrayList()}) << installation.server;
@@ -182,6 +182,31 @@ def emptystr(obj) {
     return obj==null ? "" : obj;
 }
 
+def jobComparator = {Job a,Job b -> 
+    def result = a.serverName <=> b.serverName;
+    if (result == 0) {
+        result = a.jobType <=> b.jobType;
+        if (result == 0) {
+            result = a.jobName <=> b.jobName;
+        }
+    }
+    return result;
+} as Comparator;
+def serverComparator = {Server a,Server b -> 
+    return a.serverName <=> b.serverName;
+} as Comparator;
+def databaseComparator = {Database a,Database b -> 
+    def result = a.connectionName <=> b.connectionName; 
+    if (result == 0) {
+        result = a.databaseName <=> b.databaseName;
+    }
+    return result;
+} as Comparator;
+def contactLinkComparator = {ContactLink a, ContactLink b ->
+    return a.contact.contactName <=> b.contact.contactName;
+} as Comparator;
+
+
 def undefinedColumn = environments.contains(null);
 
 println """<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js" defer></script>"""
@@ -206,7 +231,6 @@ String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
 
 String projectName =  dbm.getService(ProjectService.class).getCurrentProject().getName()
 
-
 if (undefined!=null) {
     println "<tr style=\"vertical-align: top;\">"
     println "<td>&lt;undefined&gt;</td>"
@@ -220,14 +244,19 @@ if (undefined!=null) {
         println "<td style=\"padding:5px\">"
         if (undefined.envServers.containsKey(env)) {
             println "Server<br/>";
-            undefined.envServers.get(env).each{ server->
+            def list = undefined.envServers.get(env);
+            list.sort(serverComparator);
+            list.each{ server->
                 def link = "#inventory/project:${toURL(projectName)}/servers/server:${toURL(server.serverName)}/installations"
                 println "<a href=\"${link}\">${server.serverName}</a><br/>"
             }
         }
         if (undefined.envDatabases.containsKey(env)) {
             println "Databases<br/>";
-            undefined.envDatabases.get(env).each{ db->
+            
+            def list = undefined.envDatabases.get(env);
+            list.sort(databaseComparator);
+            list.each{ db->
                 def link = "#inventory/project:${toURL(projectName)}/databases/connection:${toURL(db.connectionName)},db:${toURL(db.databaseName)}/applications"
                 println "<a href=\"${link}\">${db.connectionName}.${db.databaseName}</a><br/>"
             }
@@ -235,7 +264,9 @@ if (undefined!=null) {
         if (undefined.envJobs.containsKey(env)) {
             undefined.envJobs.get(env).entrySet().each{ e ->
                 println e.key+" jobs<br/>";
-                e.value.each{  job->
+                def list = e.value;
+                list.sort(jobComparator);
+                list.each{  job->
                     def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
                     println "<a href=\"${link}\">${job.serverName}.${job.jobName}</a><br/>"
                 }
@@ -258,7 +289,7 @@ data.each {
     println "<td><a href=\"#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/databases\">${it.key}</a></td>"
     
     println "<td>"
-    it.value.contactLinks.each{ cl ->   
+    it.value.contactLinks.sort(contactLinkComparator).each{ cl ->   
         def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
         println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
     }
@@ -271,22 +302,28 @@ data.each {
         println "<td style=\"padding:5px\">"
         if (envServers.containsKey(env)) {
             println "Server<br/>";
-            envServers.get(env).each{ server->
+            def list = envServers.get(env);
+            list.sort(serverComparator);
+            list.each{ server->
                 def link = "#inventory/project:${toURL(projectName)}/servers/server:${toURL(server.serverName)}/installations"
                 println "<a href=\"${link}\">${server.serverName}</a><br/>"
             }
         }
         if (envDatabases.containsKey(env)) {
            println "Databases<br/>";
-           envDatabases.get(env).each{ db->
+           def list = envDatabases.get(env);
+           list.sort(databaseComparator);
+           list.each{ db->
                def link = "#inventory/project:${toURL(projectName)}/databases/connection:${toURL(db.connectionName)},db:${toURL(db.databaseName)}/applications"
                println "<a href=\"${link}\">${db.connectionName}.${db.databaseName}</a><br/>"
            }
         }
         if (envJobs.containsKey(env)) {
-            envJobs.get(env).entrySet().each{ e ->
+            envJobs.get(env).entrySet().each{e ->
                 println e.key+" jobs<br/>";
-                e.value.each{  job->
+                def list = e.value;
+                list.sort(jobComparator); 
+                list.each{job->
                     def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
                     println "<a href=\"${link}\">${job.serverName}.${job.jobName}</a><br/>"
                 }
