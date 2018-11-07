@@ -19,7 +19,9 @@ import com.branegy.inventory.model.Contact
 import com.branegy.inventory.model.ContactLink
 import com.branegy.inventory.model.Job
 import com.branegy.inventory.model.Server
-import com.branegy.service.connection.model.DatabaseConnection;
+import com.branegy.service.connection.model.DatabaseConnection
+import com.branegy.cfg.IPropertySupplier;
+
 
 final InventoryService inventorySrv = dbm.getService(InventoryService.class)
 
@@ -245,6 +247,11 @@ if (undefined!=null) {
     println "</tr>"
 }
 
+def globalProperties = dbm.getService(IPropertySupplier.class)
+def roleField = globalProperties.getProperty("contract_role.role.field_name","ContactRole")
+logger.debug("Will be using field ${roleField}")
+
+
 data.each {
     println "<tr style=\"vertical-align: top;\">"
     
@@ -253,7 +260,7 @@ data.each {
     println "<td>"
     it.value.contactLinks.each{    
         def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contact.contactName)}"
-        println "<a href=\"${link}\">${it.contact.contactName}</a> ${emptystr(it.getCustomData("ContactRole"))}<br/>"
+        println "<a href=\"${link}\">${it.contact.contactName}</a> ${emptystr(it.getCustomData(roleField))}<br/>"
     }
     println "</td>"
     

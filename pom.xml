@@ -8,13 +8,13 @@
    <name>DB Landscape</name>
    <description>Generates a list of databases used by application/environment</description>
 
-   <version>0.2.1</version>
+   <version>0.3.2-SNAPSHOT</version>
    <packaging>bundle</packaging>
 
    <parent>
       <groupId>io.dbmaster.plugins</groupId>
       <artifactId>dbmaster-plugin-parent</artifactId>
-      <version>1.12-SNAPSHOT</version>
+      <version>1.12.1</version>
    </parent>
 
    <build>
