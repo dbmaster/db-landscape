@@ -8,7 +8,7 @@
    <name>DB Landscape</name>
    <description>Generates a list of databases used by application/environment</description>
 
-   <version>0.3.2-SNAPSHOT</version>
+   <version>0.3.4-SNAPSHOT</version>
    <packaging>bundle</packaging>
 
    <parent>
