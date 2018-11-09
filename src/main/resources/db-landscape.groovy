@@ -289,7 +289,9 @@ data.each {
     println "<td><a href=\"#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/databases\">${it.key}</a></td>"
     
     println "<td>"
-    it.value.contactLinks.sort(contactLinkComparator).each{ cl ->   
+    def list = it.value.contactLinks;
+    list.sort(contactLinkComparator);
+    list.each{ cl ->   
         def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
         println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
     }
