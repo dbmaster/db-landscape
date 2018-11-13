@@ -226,7 +226,7 @@ println """<table class="simple-table" cellspacing="0" cellpadding="10">
              ${environments.collect{ "<th>${it==null?"&lt;undefined&gt;":it}</th>" }.join("")}
            </tr></thead><tbody>"""
 
-def toURL = { link -> link.encodeURL().replaceAll("\\+", "%20") }
+def toURL = { link -> link }
 String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
 
 String projectName =  dbm.getService(ProjectService.class).getCurrentProject().getName()
@@ -289,9 +289,9 @@ data.each {
     println "<td><a href=\"#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/databases\">${it.key}</a></td>"
     
     println "<td>"
-    def list = it.value.contactLinks;
-    list.sort(contactLinkComparator);
-    list.each{ cl ->   
+    def list2 = it.value.contactLinks;
+    list2.sort(contactLinkComparator);
+    list2.each{ cl ->   
         def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
         println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
     }
