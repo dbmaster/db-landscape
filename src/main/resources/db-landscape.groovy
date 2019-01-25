@@ -19,6 +19,7 @@ import com.branegy.inventory.model.Contact
 import com.branegy.inventory.model.ContactLink
 import com.branegy.inventory.model.Job
 import com.branegy.inventory.model.Server
+import com.branegy.inventory.model.SecurityObject
 import com.branegy.service.connection.model.DatabaseConnection
 import com.branegy.cfg.IPropertySupplier;
 
@@ -30,6 +31,7 @@ class UnderfinedRow{
     final Map<String,Map<String,List<Job>>> envJobs = [:]; // env -> jobType <-> Job
     final Map<String,List<Database>> envDatabases = [:];
     final Map<String,List<Server>> envServers = [:];
+    final Map<String,List<SecurityObject>> envSecurityObject = [:];
 }
 
 class AppNameRow{
@@ -37,6 +39,7 @@ class AppNameRow{
     final List<ContactLink> contactLinks = [];
     final Map<String,Map<String,List<Job>>> envJobs = [:];
     final Map<String,List<Server>> envServers = [:];
+    final Map<String,List<SecurityObject>> envSecurityObject = [:];
 }
 
 Map<String,AppNameRow> data = new TreeMap(String.CASE_INSENSITIVE_ORDER);
@@ -139,6 +142,33 @@ jobs.clear();
 jobApp.clear();
 
 
+// SecurityObjects
+def getSecurityObjectKey = {so -> return so.source+"=>"+so.serverName+"=>"+so.securityObjectId;};
+def getEnvironmentBySecurityObject =  { so -> return so.getCustomData("Environment") }
+def securityObjects = inventorySrv.getSecurityObjectList(new QueryRequest(/*p_securityobject_filter*/));
+def securityObjectsApp = inventorySrv.findApplicationLinkListByObjectClass(SecurityObject.class)
+.collectEntries{[(getSecurityObjectKey(it.securityObject)): it.application]};
+securityObjects.each{ so ->
+    def securityObjectKey = getSecurityObjectKey(so);
+    def envSecurityObject = getEnvironmentBySecurityObject(so);
+    if (envSecurityObject == null) {
+        envSecurityObject = getEnvironmentByConnection(so.serverName);
+    }
+    def app = securityObjectsApp.get(securityObjectKey);
+    if (app!=null) {
+        data.get(app.applicationName).envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
+    } else {
+        if (undefined == null) {
+            undefined = new UnderfinedRow();
+        }
+        undefined.envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
+        environments << envSecurityObject;
+    }
+};
+securityObjects.clear();
+securityObjectsApp.clear();
+
+
 // servers
 def getEnvironmentByServer =  { server -> return server.getCustomData("Environment")}
 def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).collectEntries{[(it.serverName): it]};
@@ -188,6 +218,16 @@ def jobComparator = {Job a,Job b ->
         result = a.jobType <=> b.jobType;
         if (result == 0) {
             result = a.jobName <=> b.jobName;
+        }
+    }
+    return result;
+} as Comparator;
+def securityObjectComparator = {SecurityObject a,SecurityObject b ->
+    def result = a.source <=> b.source;
+    if (result == 0) {
+        result = a.serverName <=> b.serverName;
+        if (result == 0) {
+            result = a.securityObjectId <=> b.securityObjectId;
         }
     }
     return result;
@@ -272,6 +312,16 @@ if (undefined!=null) {
                 }
             }
         }
+        if (undefined.envSecurityObject.containsKey(env)){
+            println "SecurityObjects<br/>";
+            
+            def list = undefined.envSecurityObject.get(env);
+            list.sort(securityObjectComparator);
+            list.each{ so ->
+                def link = "#inventory/project:${toURL(projectName)}/security-objects/source:${toURL(so.source)},server:${toURL(so.serverName)},id:${toURL(so.securityObjectId)}/applications"
+                println "<a href=\"${link}\">${so.source}.${so.serverName}.${so.securityObjectId}</a><br/>"
+            }
+        }
         println "</td>"
     }
     
@@ -299,6 +349,7 @@ data.each {
     
     def envDatabases = it.value.envDatabases;
     def envJobs = it.value.envJobs;
+    def envSecurityObjects = it.value.envSecurityObject;
     def envServers = it.value.envServers;
     environments.each { env ->
         println "<td style=\"padding:5px\">"
@@ -329,6 +380,15 @@ data.each {
                     def link = "#inventory/project:${toURL(projectName)}/jobs/job:${toURL(job.jobName)},server:${toURL(job.serverName)},type:${toURL(job.jobType)}/applications"
                     println "<a href=\"${link}\">${job.serverName}.${job.jobName}</a><br/>"
                 }
+            }
+        }
+        if (envSecurityObjects.containsKey(env)) {
+            println "SecurityObjects<br/>";
+            def list = envSecurityObjects.get(env);
+            list.sort(securityObjectComparator);
+            list.each{ so ->
+                def link = "#inventory/project:${toURL(projectName)}/security-objects/source:${toURL(so.source)},server:${toURL(so.serverName)},id:${toURL(so.securityObjectId)}/applications"
+                println "<a href=\"${link}\">${so.source}.${so.serverName}.${so.securityObjectId}</a><br/>"
             }
         }
         println "</td>"
