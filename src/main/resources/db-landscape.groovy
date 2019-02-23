@@ -42,6 +42,11 @@ class AppNameRow{
     final Map<String,List<SecurityObject>> envSecurityObject = [:];
 }
 
+
+Set<String> includedObjects = p_include_objects as Set;
+boolean includeContacts = includedObjects.contains("Contacts");
+
+
 Map<String,AppNameRow> data = new TreeMap(String.CASE_INSENSITIVE_ORDER);
 UnderfinedRow undefined;
 
@@ -51,18 +56,20 @@ inventorySrv.getApplicationList(new QueryRequest(/*p_app_filter*/)).each{
 }
 
 // contactLinks
-def contacts = dbm.getService(ContactService.class).getContactList(new QueryRequest(/*p_contact_filter*/)).collectEntries{[(it.contactName):it]};
-dbm.getService(ContactLinkService.class).findAllByClass(Application.class,null).each{
-    data.get(it.application.applicationName).contactLinks << it;
-    contacts.remove(it.contact.contactName);
-};
-if (!contacts.isEmpty()) {
-    if (undefined == null) {
-        undefined = new UnderfinedRow();
+if (includeContacts) {
+    def contacts = dbm.getService(ContactService.class).getContactList(new QueryRequest(/*p_contact_filter*/)).collectEntries{[(it.contactName):it]};
+    dbm.getService(ContactLinkService.class).findAllByClass(Application.class,null).each{
+        data.get(it.application.applicationName).contactLinks << it;
+        contacts.remove(it.contact.contactName);
+    };
+    if (!contacts.isEmpty()) {
+        if (undefined == null) {
+            undefined = new UnderfinedRow();
+        }
+        undefined.contacts.addAll(contacts.values());
     }
-    undefined.contacts.addAll(contacts.values());
+    contacts.clear();
 }
-contacts.clear();
 
 // environments + server + database 
 def environments = [] as Set
@@ -86,109 +93,116 @@ def getEnvironmentByDatabase = {obj ->
     return env;
 };
 
-
-def ignoreDatabase = {database -> return ["master","msdb","tempdb","model"].contains(database.databaseName)};
-
-def databases = inventorySrv.getDatabaseList(new QueryRequest(/*p_db_filter*/)).findAll{!ignoreDatabase(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
-def usedDatabases = [] as Set;
-def usedConnections = [] as Set;
-inventorySrv.getDBUsageList().each{
-    if (!ignoreDatabase(it.database)) {
-        def env = getEnvironmentByDatabase(it.database);
-        data.get(it.application.applicationName).envDatabases.computeIfAbsent(env,{k->new ArrayList()}) << it.database;
-        environments << env;
-        usedDatabases << getDatabaseServerKey(it.database);
-        usedConnections << it.database.connectionName;
+if (includedObjects.contains("Databases")) {
+    def ignoreDatabase = {database -> return ["master","msdb","tempdb","model"].contains(database.databaseName)};
+    
+    def databases = inventorySrv.getDatabaseList(new QueryRequest(/*p_db_filter*/)).findAll{!ignoreDatabase(it)}.collectEntries{[(getDatabaseServerKey(it)): it]};
+    def usedDatabases = [] as Set;
+    def usedConnections = [] as Set;
+    inventorySrv.getDBUsageList().each{
+        if (!ignoreDatabase(it.database)) {
+            def env = getEnvironmentByDatabase(it.database);
+            data.get(it.application.applicationName).envDatabases.computeIfAbsent(env,{k->new ArrayList()}) << it.database;
+            environments << env;
+            usedDatabases << getDatabaseServerKey(it.database);
+            usedConnections << it.database.connectionName;
+        }
     }
+    
+    databases.keySet().removeAll(usedDatabases);
+    if (!databases.isEmpty()) {
+        if (undefined == null) {
+            undefined = new UnderfinedRow();
+        }
+        databases.values().each{
+            def env = getEnvironmentByDatabase(it);
+            undefined.envDatabases.computeIfAbsent(env,{k-> new ArrayList()}) << it;
+            environments << env;
+            usedConnections << it.connectionName;
+        }
+    }
+    usedConnections.clear();
+    usedDatabases.clear();
+    databases.clear();
 }
-
-databases.keySet().removeAll(usedDatabases);
-if (!databases.isEmpty()) {
-    if (undefined == null) {
-        undefined = new UnderfinedRow();
-    }
-    databases.values().each{
-        def env = getEnvironmentByDatabase(it);
-        undefined.envDatabases.computeIfAbsent(env,{k-> new ArrayList()}) << it;
-        environments << env;
-        usedConnections << it.connectionName;
-    }
-}
-usedConnections.clear();
-usedDatabases.clear();
-databases.clear();
 
 
 // jobs
-def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
-def jobs = inventorySrv.getJobList(new QueryRequest(/*p_job_filter*/));
-def jobApp = inventorySrv.findApplicationLinkListByObjectClass(Job.class)
-        .collectEntries{[(getJobKey(it.job)): it.application]};
-jobs.each{ job ->
-    def jobKey = getJobKey(job);
-    def envJob = getEnvironmentByJob(job);
-    def app = jobApp.get(jobKey);
-    if (app!=null) {
-        data.get(app.applicationName).envJobs.computeIfAbsent(envJob,{k->new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job
-    } else {
-        if (undefined == null) {
-            undefined = new UnderfinedRow();
+if (includedObjects.contains("Jobs")) {
+    def getJobKey = {job -> return job.serverName+"=>"+job.jobType+"=>"+job.jobName; };
+    def jobs = inventorySrv.getJobList(new QueryRequest(/*p_job_filter*/));
+    def jobApp = inventorySrv.findApplicationLinkListByObjectClass(Job.class)
+            .collectEntries{[(getJobKey(it.job)): it.application]};
+    jobs.each{ job ->
+        def jobKey = getJobKey(job);
+        def envJob = getEnvironmentByJob(job);
+        def app = jobApp.get(jobKey);
+        if (app!=null) {
+            data.get(app.applicationName).envJobs.computeIfAbsent(envJob,{k->new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job
+        } else {
+            if (undefined == null) {
+                undefined = new UnderfinedRow();
+            }
+            undefined.envJobs.computeIfAbsent(envJob,{k-> new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job;
+            environments << envJob;
         }
-        undefined.envJobs.computeIfAbsent(envJob,{k-> new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job;
-        environments << envJob;
-    }
-};
-jobs.clear();
-jobApp.clear();
+    };
+    jobs.clear();
+    jobApp.clear();
+}
 
 
 // SecurityObjects
-def getSecurityObjectKey = {so -> return so.source+"=>"+so.serverName+"=>"+so.securityObjectId;};
-def getEnvironmentBySecurityObject =  { so -> return so.getCustomData("Environment") }
-def securityObjects = inventorySrv.getSecurityObjectList(new QueryRequest(/*p_securityobject_filter*/));
-def securityObjectsApp = inventorySrv.findApplicationLinkListByObjectClass(SecurityObject.class)
-.collectEntries{[(getSecurityObjectKey(it.securityObject)): it.application]};
-securityObjects.each{ so ->
-    def securityObjectKey = getSecurityObjectKey(so);
-    def envSecurityObject = getEnvironmentBySecurityObject(so);
-    if (envSecurityObject == null) {
-        envSecurityObject = getEnvironmentByConnection(so.serverName);
-    }
-    def app = securityObjectsApp.get(securityObjectKey);
-    if (app!=null) {
-        data.get(app.applicationName).envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
-    } else {
-        if (undefined == null) {
-            undefined = new UnderfinedRow();
+if (includedObjects.contains("SecurityObjects")) {
+    def getSecurityObjectKey = {so -> return so.source+"=>"+so.serverName+"=>"+so.securityObjectId;};
+    def getEnvironmentBySecurityObject =  { so -> return so.getCustomData("Environment") }
+    def securityObjects = inventorySrv.getSecurityObjectList(new QueryRequest(/*p_securityobject_filter*/));
+    def securityObjectsApp = inventorySrv.findApplicationLinkListByObjectClass(SecurityObject.class)
+    .collectEntries{[(getSecurityObjectKey(it.securityObject)): it.application]};
+    securityObjects.each{ so ->
+        def securityObjectKey = getSecurityObjectKey(so);
+        def envSecurityObject = getEnvironmentBySecurityObject(so);
+        if (envSecurityObject == null) {
+            envSecurityObject = getEnvironmentByConnection(so.serverName);
         }
-        undefined.envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
-        environments << envSecurityObject;
-    }
-};
-securityObjects.clear();
-securityObjectsApp.clear();
+        def app = securityObjectsApp.get(securityObjectKey);
+        if (app!=null) {
+            data.get(app.applicationName).envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
+        } else {
+            if (undefined == null) {
+                undefined = new UnderfinedRow();
+            }
+            undefined.envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
+            environments << envSecurityObject;
+        }
+    };
+    securityObjects.clear();
+    securityObjectsApp.clear();
+}
 
 
 // servers
-def getEnvironmentByServer =  { server -> return server.getCustomData("Environment")}
-def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).collectEntries{[(it.serverName): it]};
-inventorySrv.getInstallationList().each{ installation ->
-    def env = getEnvironmentByServer(installation.server);
-    data.get(installation.application.applicationName).envServers.computeIfAbsent(env,{k->new ArrayList()}) << installation.server;
-    environments << env;
-    servers.remove(installation.server.serverName);
-}
-if (!servers.isEmpty()) {
-    if (undefined == null) {
-        undefined = new UnderfinedRow();
-    }
-    servers.values().each{
-        def env = getEnvironmentByServer(it);
-        undefined.envServers.computeIfAbsent(env,{k->new ArrayList()}) << it;
+if (includedObjects.contains("Servers")) {
+    def getEnvironmentByServer =  { server -> return server.getCustomData("Environment")}
+    def servers = inventorySrv.getServerList(new QueryRequest(/*p_server_filter*/)).collectEntries{[(it.serverName): it]};
+    inventorySrv.getInstallationList().each{ installation ->
+        def env = getEnvironmentByServer(installation.server);
+        data.get(installation.application.applicationName).envServers.computeIfAbsent(env,{k->new ArrayList()}) << installation.server;
         environments << env;
+        servers.remove(installation.server.serverName);
     }
+    if (!servers.isEmpty()) {
+        if (undefined == null) {
+            undefined = new UnderfinedRow();
+        }
+        servers.values().each{
+            def env = getEnvironmentByServer(it);
+            undefined.envServers.computeIfAbsent(env,{k->new ArrayList()}) << it;
+            environments << env;
+        }
+    }
+    servers.clear();
 }
-servers.clear();
 connections.clear();
 
 // sort environment
@@ -262,24 +276,26 @@ println """<table class="simple-table" cellspacing="0" cellpadding="10">
            <thead>
            <tr style="background-color:#EEE">
              <th>Application</th>
-             <th>Contacts</th>
+             ${includeContacts?"<th>Contacts</th>":""}
              ${environments.collect{ "<th>${it==null?"&lt;undefined&gt;":it}</th>" }.join("")}
            </tr></thead><tbody>"""
 
 def toURL = { link -> link }
-String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
+//String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
 
 String projectName =  dbm.getService(ProjectService.class).getCurrentProject().getName()
 
 if (undefined!=null) {
     println "<tr style=\"vertical-align: top;\">"
     println "<td>&lt;undefined&gt;</td>"
-    println "<td>"
-    /*undefined.contacts.each{
-        def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contactName)}"
-        println "<a href=\"${link}\">${it.contactName}</a><br/>"
-    }*/
-    println "</td>"
+    if (includeContacts){
+        println "<td>"
+        /*undefined.contacts.each{
+            def link = "#inventory/project:${toURL(projectName)}/contacts/contact:${toURL(it.contactName)}"
+            println "<a href=\"${link}\">${it.contactName}</a><br/>"
+        }*/
+        println "</td>"
+    }
     environments.each{ env ->
         println "<td style=\"padding:5px\">"
         if (undefined.envServers.containsKey(env)) {
@@ -338,14 +354,16 @@ data.each {
     
     println "<td><a href=\"#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/databases\">${it.key}</a></td>"
     
-    println "<td>"
-    def list2 = it.value.contactLinks;
-    list2.sort(contactLinkComparator);
-    list2.each{ cl ->   
-        def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
-        println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
+    if (includeContacts){
+        println "<td>"
+        def list2 = it.value.contactLinks;
+        list2.sort(contactLinkComparator);
+        list2.each{ cl ->   
+            def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
+            println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
+        }
+        println "</td>"
     }
-    println "</td>"
     
     def envDatabases = it.value.envDatabases;
     def envJobs = it.value.envJobs;

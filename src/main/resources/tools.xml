@@ -16,6 +16,18 @@
    -->
             <!-- parameter name="p_fields"     title="Fields To Include" type="string" required="false" width="300" 
                        defaultValue="Deleted;State;Notes" / -->
+                       
+            <parameter name="p_include_objects" title="Include Objects" type="string" required="false"
+                       multiple="true" defaultValue="Servers,Databases,Jobs,SecurityObjects,Contacts">
+                <values>
+                    <string>Servers</string>
+                    <string>Databases</string>
+                    <string>Jobs</string>
+                    <string>SecurityObjects</string>
+                    <string>Contacts</string>
+                </values>
+            </parameter>
+                       
         </parameters>
 
         <output  script="db-landscape.groovy" type="html" />
