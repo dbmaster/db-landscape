@@ -27,6 +27,8 @@
                     <string>Contacts</string>
                 </values>
             </parameter>
+            
+            <parameter name="p_exlcude_undefined"  title="Exclude objects without apps" type="boolean" required="true" defaultValue="false" />
                        
         </parameters>
 

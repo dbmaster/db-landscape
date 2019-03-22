@@ -49,6 +49,7 @@ boolean includeContacts = includedObjects.contains("Contacts");
 
 Map<String,AppNameRow> data = new TreeMap(String.CASE_INSENSITIVE_ORDER);
 UnderfinedRow undefined;
+boolean includeUndefined = !p_exlcude_undefined;
 
 // applications
 inventorySrv.getApplicationList(new QueryRequest(/*p_app_filter*/)).each{
@@ -62,7 +63,7 @@ if (includeContacts) {
         data.get(it.application.applicationName).contactLinks << it;
         contacts.remove(it.contact.contactName);
     };
-    if (!contacts.isEmpty()) {
+    if (!contacts.isEmpty() && includeUndefined) {
         if (undefined == null) {
             undefined = new UnderfinedRow();
         }
@@ -110,7 +111,7 @@ if (includedObjects.contains("Databases")) {
     }
     
     databases.keySet().removeAll(usedDatabases);
-    if (!databases.isEmpty()) {
+    if (!databases.isEmpty() && includeUndefined) {
         if (undefined == null) {
             undefined = new UnderfinedRow();
         }
@@ -139,7 +140,7 @@ if (includedObjects.contains("Jobs")) {
         def app = jobApp.get(jobKey);
         if (app!=null) {
             data.get(app.applicationName).envJobs.computeIfAbsent(envJob,{k->new LinkedHashMap()}).computeIfAbsent(job.jobType,{k->new ArrayList()}) << job
-        } else {
+        } else if (includeUndefined) {
             if (undefined == null) {
                 undefined = new UnderfinedRow();
             }
@@ -168,7 +169,7 @@ if (includedObjects.contains("SecurityObjects")) {
         def app = securityObjectsApp.get(securityObjectKey);
         if (app!=null) {
             data.get(app.applicationName).envSecurityObject.computeIfAbsent(envSecurityObject,{k->new ArrayList()}) << so;
-        } else {
+        } else if (includeUndefined) {
             if (undefined == null) {
                 undefined = new UnderfinedRow();
             }
@@ -191,7 +192,7 @@ if (includedObjects.contains("Servers")) {
         environments << env;
         servers.remove(installation.server.serverName);
     }
-    if (!servers.isEmpty()) {
+    if (!servers.isEmpty() && includeUndefined) {
         if (undefined == null) {
             undefined = new UnderfinedRow();
         }
@@ -406,7 +407,7 @@ data.each {
             list.sort(securityObjectComparator);
             list.each{ so ->
                 def link = "#inventory/project:${toURL(projectName)}/security-objects/source:${toURL(so.source)},server:${toURL(so.serverName)},id:${toURL(so.securityObjectId)}/applications"
-                println "<a href=\"${link}\">${so.source}.${so.serverName}.${so.securityObjectId}</a><br/>"
+                println "<a href=\"${link}\">${so.serverName}.${so.securityObjectId}</a><br/>"
             }
         }
         println "</td>"
