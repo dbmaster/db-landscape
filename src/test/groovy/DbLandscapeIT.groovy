@@ -13,8 +13,8 @@ public class DbLandscapeIT extends BaseToolTestNGCase {
         parameters.put("p_exlcude_undefined", Boolean.FALSE);
         parameters.put("p_include_objects",["Servers","Databases","Jobs","SecurityObjects","Contacts"] as String[]);
         
-        String result = tools.toolExecutor("db-landscape", parameters).execute()
-        assertTrue(result.contains("Application"), "Unexpected search results ${result}");
-        assertTrue(result.contains("Undefined"), "Unexpected search results ${result}");
+        String result = tools.toolExecutor("db-landscape", parameters).execute().toLowerCase();
+        assertTrue(result.contains("application"), "Unexpected search results ${result}");
+        assertTrue(result.contains("undefined"), "Unexpected search results ${result}");
     }
 }
