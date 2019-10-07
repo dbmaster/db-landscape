@@ -10,8 +10,8 @@ public class DbLandscapeIT extends BaseToolTestNGCase {
     @Test
     public void test() {
         def parameters = [ : ]
-        parameters.put("p_exlcude_undefined":false);
-        parameters.put("p_include_objects":["Servers","Databases","Jobs","SecurityObjects","Contacts"]);
+        parameters.put("p_exlcude_undefined", Boolean.FALSE);
+        parameters.put("p_include_objects",["Servers","Databases","Jobs","SecurityObjects","Contacts"]);
         
         String result = tools.toolExecutor("db-landscape", parameters).execute()
         assertTrue(result.contains("Application"), "Unexpected search results ${result}");
