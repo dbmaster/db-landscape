@@ -281,7 +281,14 @@ println """<table class="simple-table" cellspacing="0" cellpadding="10">
              ${environments.collect{ "<th>${it==null?"&lt;undefined&gt;":it}</th>" }.join("")}
            </tr></thead><tbody>"""
 
-def toURL = { link -> link }
+def toURL = { link ->
+    // the same as on UI
+    if (link.indexOf('/') == -1) {
+        return link;
+    } else {
+        return '\''+link.replace("'", "''")+'\'';
+    }
+}
 //String.metaClass.encodeURL = { java.net.URLEncoder.encode(delegate) }
 
 String projectName =  dbm.getService(ProjectService.class).getCurrentProject().getName()
@@ -361,7 +368,7 @@ data.each {
         list2.sort(contactLinkComparator);
         list2.each{ cl ->   
             def link = "#inventory/project:${toURL(projectName)}/applications/application:${toURL(it.key)}/contacts"
-            println "<a href=\"${link}\">${cl.contact.contactName}</a> ${emptystr(cl.getCustomData(roleField))}<br/>"
+            println "<a href=\"${link}\">${cl.contact.contactName}</a>${cl.contact.contactStatus==Contact.STATUS_INACTIVE?" ("+Contact.STATUS_INACTIVE+")":""} ${emptystr(cl.getCustomData(roleField))}<br/>"
         }
         println "</td>"
     }
